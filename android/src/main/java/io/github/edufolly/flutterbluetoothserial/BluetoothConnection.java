@@ -20,7 +20,7 @@ public abstract class BluetoothConnection
     protected ConnectionThread connectionThread = null;
 
     public boolean isConnected() {
-        return connectionThread != null && connectionThread.requestedClosing != true;
+        return connectionThread != null && !connectionThread.requestedClosing;
     }
 
 
@@ -31,10 +31,10 @@ public abstract class BluetoothConnection
 
 
 
-    // @TODO . `connect` could be done perfored on the other thread
+    // @TODO . `connect` could be done performed on the other thread
     // @TODO . `connect` parameter: timeout
     // @TODO . `connect` other methods than `createRfcommSocketToServiceRecord`, including hidden one raw `createRfcommSocket` (on channel).
-    // @TODO ? how about turning it into factoried?
+    // @TODO ? how about turning it into factored?
     /// Connects to given device by hardware address
     public void connect(String address, UUID uuid) throws IOException {
         if (isConnected()) {
@@ -72,7 +72,7 @@ public abstract class BluetoothConnection
         }
     }
 
-    /// Writes to connected remote device 
+    /// Writes to connected remote device
     public void write(byte[] data) throws IOException {
         if (!isConnected()) {
             throw new IOException("not connected");
@@ -165,7 +165,7 @@ public abstract class BluetoothConnection
             }
             requestedClosing = true;
 
-            // Flush output buffers befoce closing
+            // Flush output buffers before closing
             try {
                 output.flush();
             }

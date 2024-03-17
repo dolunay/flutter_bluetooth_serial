@@ -1,8 +1,26 @@
+buildscript {
+    ext.kotlin_version = '1.9.23'
+    ext.java_version='17'
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.3.0'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
 allprojects {
     repositories {
         google()
-        jcenter()
+        mavenCentral()
     }
+    // Display deprecated code lines in build report
+    // tasks.withType(JavaCompile) {
+    //     options.deprecation = true
+    // }
 }
 
 rootProject.buildDir = '../build'

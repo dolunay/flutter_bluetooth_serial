@@ -1,0 +1,121 @@
+package io.github.edufolly.flutterbluetoothserial
+
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothSocket
+import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
+import java.util.UUID
+
+abstract class BluetoothConnection(protected val bluetoothAdapter: BluetoothAdapter) {
+    companion object {
+        val DEFAULT_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+    }
+
+    private var connectionThread: ConnectionThread? = null
+
+    val isConnected: Boolean
+        get() = connectionThread?.requestedClosing == false
+
+    @Throws(IOException::class)
+    fun connect(address: String, uuid: UUID = DEFAULT_UUID) {
+        if (isConnected) {
+            throw IOException("already connected")
+        }
+        val device: BluetoothDevice = bluetoothAdapter.getRemoteDevice(address)
+            ?: throw IOException("device not found")
+        val socket: BluetoothSocket = device.createRfcommSocketToServiceRecord(uuid)
+            ?: throw IOException("socket connection not established")
+
+        bluetoothAdapter.cancelDiscovery()
+        socket.connect()
+        connectionThread = ConnectionThread(socket).apply { start() }
+    }
+
+    fun disconnect() {
+        if (isConnected) {
+            connectionThread?.cancel()
+            connectionThread = null
+        }
+    }
+
+    @Throws(IOException::class)
+    fun write(data: ByteArray) {
+        if (!isConnected) {
+            throw IOException("not connected")
+        }
+        connectionThread?.write(data)
+    }
+
+    protected abstract fun onRead(data: ByteArray)
+
+    protected abstract fun onDisconnected(byRemote: Boolean)
+
+    private inner class ConnectionThread(private val socket: BluetoothSocket) : Thread() {
+        private val input: InputStream?
+        private val output: OutputStream?
+        @Volatile
+        var requestedClosing = false
+
+        init {
+            var tmpIn: InputStream? = null
+            var tmpOut: OutputStream? = null
+            try {
+                tmpIn = socket.inputStream
+                tmpOut = socket.outputStream
+            } catch (e: IOException) {
+                e.printStackTrace()
+            }
+            input = tmpIn
+            output = tmpOut
+        }
+
+        override fun run() {
+            val buffer = ByteArray(1024)
+            var bytes: Int
+            while (!requestedClosing) {
+                try {
+                    bytes = input!!.read(buffer)
+                    onRead(buffer.copyOf(bytes))
+                } catch (e: IOException) {
+                    break
+                }
+            }
+
+            output?.closeQuietly()
+            input?.closeQuietly()
+
+            onDisconnected(!requestedClosing)
+
+            requestedClosing = true
+        }
+
+        fun write(bytes: ByteArray) {
+            try {
+                output?.write(bytes)
+            } catch (e: IOException) {
+                e.printStackTrace()
+            }
+        }
+
+        fun cancel() {
+            if (requestedClosing) return
+            requestedClosing = true
+
+            output?.flushQuietly()
+
+            try {
+                Thread.sleep(111)
+                socket.close()
+            } catch (e: Exception) {
+            }
+        }
+
+        private fun OutputStream.flushQuietly() = try { flush() } catch (e: Exception) {}
+        private fun OutputStream.closeQuietly() = try { close() } catch (e: Exception) {}
+        private fun InputStream.closeQuietly() = try { close() } catch (e: Exception) {}
+    }
+}
+
+
